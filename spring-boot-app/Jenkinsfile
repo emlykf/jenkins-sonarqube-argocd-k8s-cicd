@@ -57,13 +57,19 @@ pipeline {
                     git config user.email "test123@example.com"
                     git config user.name "emlykf"
                     BUILD_NUMBER=${BUILD_NUMBER}
-                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+                    sed -i "s|image: emlykf/ultimate-cicd:.*|image: emlykf/ultimate-cicd:${BUILD_NUMBER}|" spring-boot-app-manifests/deployment.yml
                     git add spring-boot-app-manifests/deployment.yml
                     git commit -m "Update deployment image to version ${BUILD_NUMBER}"
                     git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
                 '''
             }
         }
+    }
+  }
+  post {
+    always {
+      // give the workspace back to the jenkins user (the agent runs as root)
+      sh 'chown -R "$(stat -c %u:%g "$WORKSPACE")" "$WORKSPACE"'
     }
   }
 }
