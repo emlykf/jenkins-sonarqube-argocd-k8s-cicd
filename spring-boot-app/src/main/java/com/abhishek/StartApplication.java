@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class StartApplication {
 
+     private String password = "admin123";
+
     @GetMapping("/")
     public String index(final Model model) {
         model.addAttribute("title", "I have successfully built a Spring Boot application using Maven - v2");
