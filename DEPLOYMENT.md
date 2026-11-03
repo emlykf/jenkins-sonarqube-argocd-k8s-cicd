@@ -175,7 +175,26 @@ In Jenkins, click New Item, name it `ultimate-demo` and choose Pipeline. Then se
 
 Click Save.
 
-## 13. Launch the Kubernetes EC2 instance
+## 13. Set Up the GitHub Webhook
+
+In the Jenkins job, click **Configure** and set:
+
+- **Triggers:** tick GitHub hook trigger for GITScm polling
+- **Pipeline → Git → Additional Behaviours:**
+  - Polling ignores commits in certain paths, **Excluded Regions:** `spring-boot-app-manifests/.*`
+  - Force polling using workspace
+
+Click **Save**.
+
+In your GitHub repo, go to **Settings → Webhooks → Add webhook**:
+
+- **Payload URL:** `http://<jenkins-public-ip>:8080/github-webhook/`
+- **Content type:** `application/json`
+- **Events:** Just the push event
+
+Verify: under **Recent Deliveries**, the ping shows a green check.
+
+## 14. Launch the Kubernetes EC2 instance
 
 Launch an instance with:
 
@@ -190,7 +209,7 @@ Connect to it:
 ssh -i <your-key>.pem ubuntu@<k8s-public-ip>
 ```
 
-## 14. Install Minikube
+## 15. Install Minikube
 
 Install Docker:
 
@@ -217,7 +236,7 @@ minikube start --memory=6g
 kubectl get nodes
 ```
 
-## 15. Install OLM and the Argo CD Operator
+## 16. Install OLM and the Argo CD Operator
 
 The install commands come from operatorhub.io. Search for Argo CD, click Install and copy the commands shown there. They always contain the current OLM version.
 
@@ -236,7 +255,7 @@ kubectl get csv -n operators -w
 
 Wait until the phase shows `Succeeded`, then press Ctrl + C.
 
-## 16. Create the Argo CD instance
+## 17. Create the Argo CD instance
 
 The file `argocd/argocd-basic.yaml` is based on the basic example from the Argo CD Operator documentation (operatorhub.io → Argo CD → Operator Documentation → Usage → Basics), with the server service set to NodePort.
 
@@ -247,7 +266,7 @@ kubectl get pods -w
 
 Wait until all example-argocd pods are running, then press Ctrl + C.
 
-## 17. Open the Argo CD UI
+## 18. Open the Argo CD UI
 
 Start the port-forward and keep the terminal open:
 
@@ -265,7 +284,7 @@ kubectl get secret example-argocd-cluster -o jsonpath='{.data.admin\.password}' 
 
 Log in with admin and that password.
 
-## 18. Create the Argo CD Application
+## 19. Create the Argo CD Application
 
 Click New App and fill in:
 
@@ -280,9 +299,9 @@ Click New App and fill in:
 
 Click Create.
 
-## 19. Run the pipeline
+## 20. Run the pipeline
 
-In Jenkins, open `ultimate-demo` and click Build Now.
+Push a change to the `spring-boot-app` folder. The webhook starts the build automatically. Build Now in Jenkins still works for a manual run.
 
 When the build is green, check:
 
@@ -291,7 +310,7 @@ When the build is green, check:
 - GitHub: new commit "Update deployment image to version ..."
 - Argo CD: Synced and Healthy
 
-## 20. Open the app
+## 21. Open the app
 
 On the Kubernetes EC2, in a new SSH session:
 
@@ -301,9 +320,11 @@ kubectl port-forward svc/spring-boot-app-service 8010:80 --address 0.0.0.0
 
 Open `http://<k8s-public-ip>:8010`.
 
-## 21. Start everything again after a restart
+## 22. Start everything again after a restart
 
 Both instances get new public IPs after a restart.
+
+In GitHub, update the Payload URL of the webhook with the new Jenkins public IP: Settings → Webhooks → Edit.
 
 On the Jenkins EC2, start SonarQube:
 
@@ -321,9 +342,9 @@ minikube start
 kubectl get pods
 ```
 
-Then start the port-forwards again from step 17 and step 20.
+Then start the port-forwards again from step 18 and step 21.
 
-## 22. Clean up
+## 23. Clean up
 
 Terminate both EC2 instances and delete their security groups.
 
