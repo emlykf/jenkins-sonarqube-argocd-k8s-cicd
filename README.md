@@ -1,8 +1,10 @@
 # Jenkins CI/CD – Java Spring Boot App
 
-Automating the build, code analysis and deployment of a Java Spring Boot app: Jenkins builds and tests the app with Maven, SonarQube checks the code quality, and Argo CD watches the Git repo and automatically deploys every new version to Kubernetes (Minikube).
+Automating the build, code analysis and deployment of a Java Spring Boot app: on every push, Jenkins builds and tests the app with Maven, SonarQube checks the code quality, and Argo CD watches the Git repo and automatically deploys every new version to Kubernetes (Minikube).
 
-<img src="images/jenkins-cicd-diagram.png" alt="Jenkins CI/CD diagram" width="700">
+As my own upgrade, two Bash scripts in [scripts/](scripts/) set up systemd services for SonarQube, Minikube and the port-forwards, so everything starts again on its own after an EC2 restart, without SSH.
+
+<img src="images/jenkins-cicd-diagram.png" alt="Jenkins CI/CD diagram" width="650">
 
 ## Notes
 
@@ -14,7 +16,17 @@ Automating the build, code analysis and deployment of a Java Spring Boot app: Je
 
 ## Challenges & How I Resolved Them
 
-### 1. Old Docker Client in the Jenkins Agent
+### 1. The Webhook Started an Endless Build Loop
+
+**Problem:** After adding the GitHub webhook, every build started another one, because the pipeline's own commit (the new image tag in `deployment.yml`) also triggered the webhook. The excluded path for the manifests folder was ignored, since Jenkins only compared commit IDs (`git ls-remote`) and never looked at which files changed.
+
+**Solution:** In the Jenkins job, added **Force polling using workspace** next to **Polling ignores commits in certain paths** (`spring-boot-app-manifests/.*`), so Jenkins checks the changed files.
+
+**Result:** A push to the app code starts exactly one build, and the pipeline's own commit is ignored.
+
+---
+
+### 2. Old Docker Client in the Jenkins Agent
 
 **Problem:** The Docker build failed with `client version 1.41 is too old`, because the agent image was 3 years old and its Docker client couldn't talk to the current Docker on my EC2.
 
@@ -30,7 +42,7 @@ Automating the build, code analysis and deployment of a Java Spring Boot app: Je
 
 ---
 
-### 2. Minikube Ran Out of Memory
+### 3. Minikube Ran Out of Memory
 
 **Problem:** The Argo CD UI and `kubectl` timed out, because the instance had only 272 MB of memory left.
 
@@ -38,41 +50,10 @@ Automating the build, code analysis and deployment of a Java Spring Boot app: Je
 
 **Result:** Argo CD and the app run smoothly.
 
----
 
-### 3. Jenkins Couldn't Fetch the Code After a Successful Build
 
-**Problem:** The build failed at the start with `insufficient permission ... .git/objects`, because the last build's Git commit (made as root inside the container) left files Jenkins wasn't allowed to change. Like a boss saving files in an employee's folder that only the boss can edit.
 
-**Solution:** Gave the folder back with `sudo chown -R jenkins:jenkins /var/lib/jenkins/workspace/ultimate-demo`, and added a `post` block to the Jenkinsfile that does this after every build.
-
-**Result:** Every build leaves the workspace owned by Jenkins.
-
----
-
-### 4. The Image Tag Was Only Updated Once
-
-**Problem:** The second deployment failed with `nothing to commit`, because `sed` searched for the placeholder `replaceImageTag`, which was already replaced in the first build.
-
-**Solution:** Changed `sed` to replace whatever tag is in the image line:
-
-```bash
-sed -i "s|image: emlykf/ultimate-cicd:.*|image: emlykf/ultimate-cicd:${BUILD_NUMBER}|" spring-boot-app-manifests/deployment.yml
-```
-
-**Result:** Every build updates the image tag, so Argo CD gets each new version.
-
----
-
-### 5. The Webhook Started an Endless Build Loop
-
-**Problem:** After adding the GitHub webhook, every build started another one, because the pipeline's own commit (the new image tag in `deployment.yml`) also triggered the webhook. The excluded path for the manifests folder was ignored, since Jenkins only compared commit IDs (`git ls-remote`) and never looked at which files changed.
-
-**Solution:** In the Jenkins job, added **Force polling using workspace** next to **Polling ignores commits in certain paths** (`spring-boot-app-manifests/.*`), so Jenkins checks the changed files.
-
-**Result:** A push to the app code starts exactly one build, and the pipeline's own commit is ignored.
-
-### More smaller problems and how I fixed them: [other-challenges.md](other-challenges.md) 
+### More problems and how I fixed them on [other-challenges.md](other-challenges.md) 
 
 ## Test Scenarios
  
@@ -118,4 +99,4 @@ After:
 
 ## 📝 Credit
 
-Inspired by @iam-veeramalla. Upgraded setup, fixes and test scenarios by me.
+Inspired by @iam-veeramalla. Updated setup, fixes, autostart scripts and test scenarios by me.
